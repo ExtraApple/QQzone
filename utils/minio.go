@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/cors"
 )
 
 // 上传文件
@@ -31,6 +32,25 @@ func UploadFile(bucketName, objectName string, file multipart.File, fileSize int
 			return "", fmt.Errorf("create bucket error:%v", err)
 		}
 	}
+
+	global.MinioClient.SetBucketPolicy(context.Background(), bucketName, fmt.Sprintf(`{
+		"Version": "2012-10-17",
+		"Statement": [{
+			"Effect": "Allow",
+			"Principal": {"AWS": ["*"]},
+			"Action": ["s3:GetObject"],
+			"Resource": ["arn:aws:s3:::%s/*"]
+		}]
+	}`, bucketName))
+
+	global.MinioClient.SetBucketCors(context.Background(), bucketName, cors.NewConfig([]cors.Rule{
+		{
+			AllowedOrigin: []string{"*"},
+			AllowedMethod: []string{"GET", "HEAD"},
+			AllowedHeader: []string{"*"},
+			MaxAgeSeconds: 86400,
+		},
+	}))
 	//设置对象元数据
 	contentType := "application/octet-stream"
 	ext := strings.ToLower(filepath.Ext(objectName)) //提取文件扩展名并转为小写

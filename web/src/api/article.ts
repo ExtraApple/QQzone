@@ -28,9 +28,7 @@ export function articleDetail(id: number) {
 }
 
 export function createArticle(formData: FormData) {
-  return request.post<{ msg: string; article: Article }>('/articles/create', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  })
+  return request.post<{ msg: string; article: Article }>('/articles/create', formData)
 }
 
 export function deleteArticle(id: number) {
