@@ -8,6 +8,31 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// 文章列表
+func ArticleList(c *gin.Context) {
+	articles, err := service.ListArticles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"articles": service.ToArticleListResponse(articles)})
+}
+
+// 文章详情
+func ArticleDetail(c *gin.Context) {
+	articleID, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid article id"})
+		return
+	}
+	article, err := service.GetArticle(uint(articleID))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "article not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"article": service.ToArticleResponse(article)})
+}
+
 // 文章创建
 func ArticleCreate(c *gin.Context) {
 	// 获取用户ID

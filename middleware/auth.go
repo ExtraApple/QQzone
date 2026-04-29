@@ -48,9 +48,8 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		// 3. 保存 claims
 		c.Set("user", claims)
-
-		// 额外保存 userID，方便 API 层直接使用
 		c.Set("userID", claims.UserID)
+		c.Set("token", tknStr)
 
 		c.Next()
 	}

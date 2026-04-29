@@ -75,8 +75,30 @@ func Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
 
+func Logout(c *gin.Context) {
+	tknStr, exists := c.Get("token")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "token not found"})
+		return
+	}
+	token := tknStr.(string)
+
+	if global.RDB == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "redis not initialized"})
+		return
+	}
+
+	if err := global.RDB.Set(initialize.Ctx, utils.RedisBlacklistKey(token), "true", 7*24*time.Hour).Err(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to revoke token"})
+		return
+	}
+
+	global.RDB.Del(initialize.Ctx, utils.RedisSessionKey(token))
+
+	c.JSON(http.StatusOK, gin.H{"msg": "logout ok"})
+}
+
 func AdminOnly(c *gin.Context) {
-	// middleware 已经验证并放入 context
 	u, _ := c.Get("user")
 	c.JSON(http.StatusOK, gin.H{
 		"msg":  "hello admin",

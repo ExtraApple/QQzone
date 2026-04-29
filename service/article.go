@@ -8,6 +8,7 @@ import (
 	"log"
 	"mime/multipart"
 	"strings"
+	"time"
 
 	"gorm.io/gorm"
 )
@@ -72,33 +73,79 @@ func CreateArticle(userID uint, title, content string, files []*multipart.FileHe
 	return &article, nil
 }
 
+// ListArticles 获取所有文章列表，带媒体，按时间倒序
+func ListArticles() ([]model.Article, error) {
+	var articles []model.Article
+	if err := global.DB.Preload("Media").Order("created_at desc").Find(&articles).Error; err != nil {
+		return nil, err
+	}
+	return articles, nil
+}
+
+// GetArticle 获取单篇文章
+func GetArticle(articleID uint) (*model.Article, error) {
+	var article model.Article
+	if err := global.DB.Preload("Media").First(&article, articleID).Error; err != nil {
+		return nil, err
+	}
+	return &article, nil
+}
+
 // DeleteArticle 删除文章及其媒体（只允许作者自己删）
 func DeleteArticle(articleID uint, userID uint) error {
 	var article model.Article
-	// 预加载 Media
 	if err := global.DB.Preload("Media").First(&article, articleID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
 		return err
 	}
 
-	// 权限校验：只能删除自己的文章
 	if article.UserID != userID {
 		return errors.New("permission denied")
 	}
 
-	// 删除 MinIO 文件
 	for _, media := range article.Media {
 		if err := utils.DeleteFile("articles", media.ObjectKey); err != nil {
-			log.Printf("⚠️ Failed to delete file %s: %v", media.ObjectKey, err)
+			log.Printf("Failed to delete file %s: %v", media.ObjectKey, err)
 		}
 	}
 
-	// 删除文章（级联删除 Media）
 	if err := global.DB.Delete(&article).Error; err != nil {
 		return err
 	}
-
 	return nil
+}
+
+// ArticleResponse 对外返回结构（隐藏 DB 层细节）
+type ArticleResponse struct {
+	ID        uint          `json:"id"`
+	Title     string        `json:"title"`
+	Content   string        `json:"content"`
+	UserID    uint          `json:"user_id"`
+	Media     []model.Media `json:"media"`
+	CreatedAt time.Time     `json:"created_at"`
+	UpdatedAt time.Time     `json:"updated_at"`
+}
+
+// ToArticleResponse 将 model.Article 转为对外响应结构
+func ToArticleResponse(a *model.Article) ArticleResponse {
+	return ArticleResponse{
+		ID:        a.ID,
+		Title:     a.Title,
+		Content:   a.Content,
+		UserID:    a.UserID,
+		Media:     a.Media,
+		CreatedAt: a.CreatedAt,
+		UpdatedAt: a.UpdatedAt,
+	}
+}
+
+// ToArticleListResponse 批量转换
+func ToArticleListResponse(articles []model.Article) []ArticleResponse {
+	res := make([]ArticleResponse, 0, len(articles))
+	for i := range articles {
+		res = append(res, ToArticleResponse(&articles[i]))
+	}
+	return res
 }
